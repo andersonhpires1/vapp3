@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { 
   Clock, CalendarCheck, DollarSign, Target, User, Zap, Check, Play, Pause, Plus, X,
-  ArrowRightLeft, AlertCircle, ArrowLeft, Users, CheckCircle2, TrendingUp, ArrowUpRight, Sparkles
+  ArrowRightLeft, AlertCircle, ArrowLeft, Users, CheckCircle2, TrendingUp, ArrowUpRight, Sparkles,
+  MessageCircle, Scissors
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { SalonAdminSettings, CatalogServiceItem, BookingAppointment, SalonProfessionalItem, UserPersona } from '../../types';
@@ -755,74 +756,208 @@ export const ProfessionalDashboardView: React.FC<ProfessionalDashboardViewProps>
     const firstName = rawFullName.split(' ')[0] || 'Cliente';
     const serviceText = app.serviceName || app.service || app.serviceTitle || 'Atendimento';
 
-    const { startTimeStr, durationHhMm, endTimeHhMm } = calculateAppointmentTimes(app);
+    const { startTimeStr, durationHhMm, endTimeHhMm, durationMinutes } = calculateAppointmentTimes(app);
 
+    // Formatação de telefone e link para WhatsApp com 1 toque
+    const clientPhone = (app.clientPhone || app.customerPhone || '').replace(/\D/g, '');
+    const hasPhone = clientPhone.length >= 10;
+    const whatsappUrl = hasPhone 
+      ? `https://wa.me/55${clientPhone}?text=${encodeURIComponent(`Olá ${firstName}! Tudo bem? Seu atendimento de ${serviceText} no Vagou está próximo. Já estou com tudo pronto na bancada!`)}`
+      : null;
+
+    // Card 1: Ficha Sintética Operacional de Bancada (Próximo / Em Atendimento)
+    if (cardIndex === 1) {
+      return (
+        <div
+          key={appKey}
+          id="professional-next-appointment-card"
+          className={`w-full rounded border select-none transition-all duration-200 overflow-hidden ${
+            isDark 
+              ? isProgress 
+                ? 'bg-slate-900 border-emerald-500/80 ring-1 ring-emerald-500/40' 
+                : 'bg-slate-900 border-slate-800' 
+              : isProgress 
+                ? 'bg-white border-emerald-500 shadow-xs ring-1 ring-emerald-500/40' 
+                : 'bg-white border-slate-200 shadow-xs'
+          }`}
+        >
+          {/* Faixa Superior: Status + Horário + Controles Rápidos */}
+          <div className={`px-3 py-2 border-b flex items-center justify-between ${
+            isProgress 
+              ? 'bg-emerald-500/10 border-emerald-500/30' 
+              : isDark ? 'bg-slate-850 border-slate-800' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                isProgress
+                  ? 'bg-emerald-500 text-white'
+                  : isPaused
+                    ? 'bg-amber-500 text-white'
+                    : isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-800'
+              }`}>
+                {isProgress ? (
+                  <>
+                    <Zap className="w-2.5 h-2.5 text-white fill-white animate-pulse" />
+                    <span>Na Cadeira</span>
+                  </>
+                ) : isPaused ? (
+                  <>
+                    <Pause className="w-2.5 h-2.5 text-white fill-white" />
+                    <span>Pausado</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-2.5 h-2.5" />
+                    <span>Próximo Atendimento</span>
+                  </>
+                )}
+              </span>
+
+              <span className="font-mono text-xs font-bold text-slate-400">
+                {startTimeStr} → {endTimeHhMm} ({durationHhMm})
+              </span>
+            </div>
+
+            {/* Valor do Serviço */}
+            <div className="flex items-center gap-1 font-mono font-black text-xs text-emerald-600 dark:text-emerald-400">
+              <span>R$ {Number(app.totalPrice || 45).toFixed(2).replace('.', ',')}</span>
+            </div>
+          </div>
+
+          {/* Corpo: Mini-Ficha do Cliente (Foto + Nome + Serviço + Badges Operacionais) */}
+          <div className="p-3 flex items-center justify-between gap-3">
+            <div 
+              onClick={() => handleOpenActionModal(app)}
+              className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
+              title="Clique para abrir detalhes do atendimento"
+            >
+              {/* Foto ou Avatar com Inicial */}
+              <div className={`w-11 h-11 rounded shrink-0 flex items-center justify-center font-bold text-xs shadow-2xs overflow-hidden border ${
+                isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700'
+              }`}>
+                <User className="w-6 h-6 stroke-[1.75]" />
+              </div>
+
+              {/* Nome + Serviço + Tag de Ficha */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className={`font-bold text-sm truncate leading-tight ${
+                    isDark ? 'text-white' : 'text-slate-900'
+                  }`}>
+                    {rawFullName}
+                  </h3>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                    isDark ? 'bg-slate-800/80 border-slate-700 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'
+                  }`}>
+                    Cliente Cadastrado
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                  <Scissors className="w-3 h-3 shrink-0 text-slate-400" />
+                  <span>{serviceText}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Ações Rápidas de Bancada: WhatsApp + Iniciar / Concluir */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {whatsappUrl && (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hapticLight();
+                  }}
+                  className={`w-9 h-9 rounded border flex items-center justify-center transition active:scale-95 cursor-pointer ${
+                    isDark 
+                      ? 'bg-slate-800 border-slate-700 text-emerald-400 hover:bg-slate-750' 
+                      : 'bg-slate-100 border-slate-200 text-emerald-600 hover:bg-slate-200'
+                  }`}
+                  title={`Enviar WhatsApp para ${firstName}`}
+                >
+                  <MessageCircle className="w-4 h-4 fill-emerald-500/20" />
+                </a>
+              )}
+
+              {isProgress ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const protocolCode = app.protocolCode || app.id;
+                    handleCompleteAppointment(protocolCode);
+                  }}
+                  className="h-9 px-3 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-xs"
+                  title="Concluir Atendimento"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span className="hidden sm:inline">Concluir</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const protocolCode = app.protocolCode || app.id;
+                    handleStartAppointment(protocolCode);
+                  }}
+                  className="h-9 px-3 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-xs"
+                  title="Iniciar Atendimento na Cadeira"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  <span>Iniciar</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Card 2: Subsequente Sintético Compacto
     return (
       <button
         key={appKey}
-        id={cardIndex === 1 ? 'professional-next-appointment-card' : 'professional-subsequent-appointment-card'}
+        id="professional-subsequent-appointment-card"
         type="button"
         onClick={() => handleOpenActionModal(app)}
-        style={{ height: '65px' }}
-        title={`Clique para gerenciar atendimento de ${rawFullName}`}
-        className={`grid grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr] rounded border overflow-hidden select-none w-full text-left cursor-pointer active:scale-[0.99] transition hover:shadow-xs ${
+        style={{ height: '62px' }}
+        title={`Subsequente: ${rawFullName} às ${startTimeStr}`}
+        className={`grid grid-cols-[0.8fr_0.8fr_1.4fr_1fr] rounded border overflow-hidden select-none w-full text-left cursor-pointer active:scale-[0.99] transition hover:shadow-xs ${
           isDark 
-            ? isProgress 
-              ? 'bg-slate-900 border-emerald-500/80 text-white ring-1 ring-emerald-500/50' 
-              : 'bg-slate-900 border-slate-800 text-white' 
-            : isProgress 
-              ? 'bg-white border-emerald-500 text-slate-900 shadow-xs ring-1 ring-emerald-500' 
-              : 'bg-white border-slate-200 text-slate-900 shadow-xs'
+            ? 'bg-slate-900 border-slate-800 text-white hover:border-slate-700' 
+            : 'bg-white border-slate-200 text-slate-900 shadow-xs hover:border-slate-300'
         }`}
       >
-        {/* Coluna 1: Horário em destaque grande (-20% de largura) */}
-        <div 
-          className={`flex flex-col items-center justify-center text-center p-0.5 border-r overflow-hidden relative ${
-            cardIndex === 1 
-              ? 'bg-emerald-600 border-emerald-700 text-white' 
-              : isProgress 
-                ? 'bg-emerald-500 border-emerald-600 text-white' 
-                : isDark 
-                  ? 'bg-slate-900 border-slate-800 text-slate-200' 
-                  : 'bg-slate-100 border-slate-200 text-slate-900'
-          }`}
-        >
-          {isProgress && (
-            <span className="text-[7.5px] font-black uppercase text-white tracking-widest leading-none mb-0.5 flex items-center gap-0.5">
-              <Zap className="w-2 h-2 text-white fill-white animate-pulse" />
-              <span>Agora</span>
-            </span>
-          )}
-          {isPaused && (
-            <span className="text-[7.5px] font-black uppercase tracking-widest leading-none mb-0.5 text-white">
-              Pausa
-            </span>
-          )}
-          <span 
-            className={`font-mono font-black tracking-tight leading-none text-lg ${
-              cardIndex === 1 || isProgress ? 'text-white' : (isDark ? 'text-slate-100' : 'text-slate-900')
-            }`}
-          >
+        {/* Coluna 1: Horário */}
+        <div className={`flex flex-col items-center justify-center text-center p-0.5 border-r overflow-hidden ${
+          isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-900'
+        }`}>
+          <span className="text-[7.5px] font-bold uppercase tracking-wider text-slate-500 leading-none mb-0.5">
+            Seguinte
+          </span>
+          <span className="font-mono font-black text-sm leading-none">
             {startTimeStr}
           </span>
         </div>
 
-        {/* Coluna 2: Foto do cliente sobre primeiro nome (-20% de largura) */}
+        {/* Coluna 2: Foto + Nome */}
         <div className={`flex flex-col h-full w-full p-0 border-r overflow-hidden ${
           isDark ? 'border-slate-800' : 'border-slate-200'
         }`}>
-          <div className={`h-[70%] w-full flex items-center justify-center p-0.5 border-b ${
+          <div className={`h-[65%] w-full flex items-center justify-center p-0.5 border-b ${
             isDark ? 'bg-slate-800/80 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'
           }`}>
-            <div 
-              className={`w-[95%] h-[95%] max-w-[40px] max-h-[40px] aspect-square rounded flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs overflow-hidden ${
-                isDark ? 'bg-slate-900/90 text-slate-300 ring-1 ring-slate-700/80' : 'bg-white text-slate-700 ring-1 ring-slate-200'
-              }`}
-            >
+            <div className={`w-[90%] h-[90%] max-w-[34px] max-h-[34px] aspect-square rounded flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
+              isDark ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700'
+            }`}>
               <User className="w-[65%] h-[65%] stroke-[1.75]" />
             </div>
           </div>
-          <div className={`h-[30%] w-full flex items-center justify-center px-0.5 ${
+          <div className={`h-[35%] w-full flex items-center justify-center px-0.5 ${
             isDark ? 'bg-slate-900/60' : 'bg-white'
           }`}>
             <span className={`font-bold truncate max-w-full text-[9px] leading-tight text-center ${
@@ -833,35 +968,28 @@ export const ProfessionalDashboardView: React.FC<ProfessionalDashboardViewProps>
           </div>
         </div>
 
-        {/* Coluna 3: Descrição do serviço com quebra de texto */}
+        {/* Coluna 3: Serviço */}
         <div className={`flex items-center justify-center text-center px-1.5 py-0.5 border-r overflow-hidden ${
           isDark ? 'border-slate-800' : 'border-slate-200'
         }`}>
-          <p className={`text-[10px] font-bold text-center leading-snug whitespace-normal break-words line-clamp-3 ${
+          <p className={`text-[10px] font-bold text-center leading-snug line-clamp-2 ${
             isDark ? 'text-slate-200' : 'text-slate-800'
           }`}>
             {serviceText}
           </p>
         </div>
 
-        {/* Coluna 4: Tempo estimado de duração (HH:MM) sobre Horário de término (HH:MM) */}
+        {/* Coluna 4: Duração e Término */}
         <div className="flex flex-col h-full w-full p-0 overflow-hidden">
-          {/* Top: Duração estimada (apenas HH:MM) */}
-          <div 
-            className={`flex-1 w-full flex items-center justify-center border-b px-1 font-mono text-[11px] font-bold tracking-tight ${
-              isDark ? 'bg-slate-800/80 border-slate-700/60 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700'
-            }`}
-          >
+          <div className={`flex-1 w-full flex items-center justify-center border-b px-1 font-mono text-[10px] font-bold ${
+            isDark ? 'bg-slate-850 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'
+          }`}>
             <span>{durationHhMm}</span>
           </div>
-
-          {/* Bottom: Horário de término do serviço (HH:MM) */}
-          <div 
-            className={`flex-1 w-full flex items-center justify-center px-1 font-mono text-[11px] font-black tracking-tight ${
-              isDark ? 'bg-slate-900 border-slate-800 text-emerald-400' : 'bg-slate-50 text-emerald-600'
-            }`}
-          >
-            <span>{endTimeHhMm}</span>
+          <div className={`flex-1 w-full flex items-center justify-center px-1 font-mono text-[10.5px] font-bold ${
+            isDark ? 'bg-slate-900 text-emerald-400' : 'bg-slate-50 text-emerald-600'
+          }`}>
+            <span>térm. {endTimeHhMm}</span>
           </div>
         </div>
       </button>

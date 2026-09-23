@@ -15,6 +15,35 @@ Este arquivo registra cronologicamente todas as modificações relevantes realiz
 
 ## 📜 Registros de Alterações
 
+### [2026-09-23] — Ficha Relâmpago Operacional de Bancada (Próximo Cliente / Na Cadeira)
+- **Tipo:** `[Feature / UI/UX Cockpit / Professional Dashboard]`
+- **Motivo / Solicitação:** Usuário solicitou transformar o topo inicial do painel profissional em uma ferramenta prática de trabalho de bancada ("com o app na mão para trabalhar, não apenas um agendador"), exibindo o próximo cliente com ficha sintética, status em tempo real e ações diretas.
+- **Ações Realizadas:**
+  - `src/components/professional/ProfessionalDashboardView.tsx`:
+    - Evolução do card do próximo cliente para uma **Ficha Sintética Operacional de Bancada**:
+      - **Faixa Superior de Cockpit:** Status vivo com pulso em tempo real (`Na Cadeira` / `Próximo Atendimento` / `Pausado`), régua de horários (`14:30 → 15:15`) e valor do serviço em destaque font-mono.
+      - **Corpo da Ficha:** Foto/avatar do cliente, nome completo, badge de cliente cadastrado e serviço com ícone de tesoura.
+      - **Ações de 1 Toque de Bancada:** Botão direto de WhatsApp com mensagem contextual pronta ("*Olá [Nome], seu atendimento no Vagou está próximo. Já estou com tudo pronto na bancada!*") e botão primário dinâmico (`[▶ Iniciar]` / `[✓ Concluir]`).
+    - Nivelamento do card seguinte subsequente em layout compacto proporcional (`Seguinte: 15:45`).
+    - Conformidade com as regras de design system do Vagou (cantos de 4px `rounded`, WCAG AA nos modos claro/escuro e zero "caixa dentro de caixa").
+- **Arquivos Impactados:**
+  - `src/components/professional/ProfessionalDashboardView.tsx`
+  - `CHANGELOG.md`
+
+
+
+### [2026-09-23] — Ajuste na Inicialização do Servidor de Desenvolvimento e Resolução de Port Binding
+- **Tipo:** `[Fix / Infrastructure / Dev Server]`
+- **Motivo / Solicitação:** Dev server não subiu / erro de inicialização relatado pelo usuário.
+- **Ações Realizadas:**
+  - `server.ts`: Atualizado para ler dinamicamente a porta a partir de flags de linha de comando (`--port <port>`), variável de ambiente `PORT` ou padrão 3000 (`cliPort || process.env.PORT || 3000`).
+  - Efetuado restart limpo do processo do servidor de desenvolvimento através de `restart_dev_server`.
+  - Verificada a resposta HTTP 200 via `curl -I http://localhost:3000`.
+- **Arquivos Impactados:**
+  - `server.ts`
+  - `CHANGELOG.md`
+
+
 ### [2026-09-22] — Harmonização Visual Completa do Tema Claro, Padronização de Bordas e Auditoria de Código Limpo
 - **Tipo:** `[Refactor / UI/UX Design System / Clean Code / Light Theme]`
 - **Motivo / Solicitação:** 
