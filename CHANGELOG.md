@@ -15,6 +15,107 @@ Este arquivo registra cronologicamente todas as modificações relevantes realiz
 
 ## 📜 Registros de Alterações
 
+### [2026-09-28] — Restauração do Botão "Entrar" no Cabeçalho e Eliminação de Avatares Indevidos
+- **Tipo:** `[Fix / UI/UX / Clean Code / Identity & State]`
+- **Motivo / Solicitação:** Usuário expressou forte insatisfação com a exibição de uma foto de avatar no cabeçalho quando o usuário não está logado, lembrando que a decisão consolidada do projeto define que naquele local deve ficar o botão **"Entrar"**, além de solicitar expressamente a remoção de todas as fotos de perfil padrão da Unsplash hardcoded que estavam poluindo o sistema.
+- **Ações Realizadas:**
+  - `src/components/SalonProfileView.tsx`:
+    - **Restauração do Botão "Entrar" no Cabeçalho:** Quando o usuário for visitante / não estiver autenticado (`!isClientLoggedIn && currentPersona === 'cliente'`), o cabeçalho superior renderiza estritamente o botão **"Entrar"** (`bg-[#20C933]`, `text-white`, ícone `LogIn`, cantos `rounded-[4px]`) com disparo direto do modal de login/cadastro (`UserAuthModal`).
+    - Quando logado (ou no modo gestão), exibe o botão de perfil com o avatar real do usuário (se fornecido) ou um fallback limpo com a inicial do nome ou ícone vetorial `User` do Lucide.
+    - Removidas todas as URLs de fotos padrão da Unsplash que eram atribuídas a clientes deslogados ou convidados.
+    - Corrigido o avatar da equipe para o barbeiro Carlos Henrique para imagem masculina profissional correspondente.
+  - `src/components/ProfileDrawer.tsx`:
+    - Removido o fallback de avatar Unsplash. Caso o cliente não possua foto cadastrada, o card de perfil renderiza um emblema minimalista com a inicial do seu nome ou ícone `User` vetorial.
+  - `src/App.tsx`:
+    - Removidas as atribuições padrão de avatares fotográficos no estado inicial de `userAvatarUrl` e no polling `loadAppointments`.
+    - Corrigido o avatar de Carlos Silva nos cards de oferta do estabelecimento.
+  - `src/components/UserAuthModal.tsx`:
+    - Removida a injeção forçada de foto da Unsplash ao concluir login simulado ou registro. A foto padrão agora inicia limpa (`''`), permitindo que o cliente defina sua foto apenas se desejar.
+  - `src/components/UserDashboard.tsx`:
+    - Removidos os presets de avatares fotográficos da Unsplash e ajustado o visualizador da foto de perfil para exibir o ícone `User` vetorial elegante quando não houver imagem carregada.
+  - `src/components/professional/ProfessionalDashboardView.tsx`:
+    - Corrigido o avatar de Carlos Henrique no painel de equipe.
+- **Arquivos Impactados:**
+  - `src/components/SalonProfileView.tsx`
+  - `src/components/ProfileDrawer.tsx`
+  - `src/App.tsx`
+  - `src/components/UserAuthModal.tsx`
+  - `src/components/UserDashboard.tsx`
+  - `src/components/professional/ProfessionalDashboardView.tsx`
+  - `CHANGELOG.md`
+
+### [2026-09-28] — Ocultação de Botões Restritos e Exigência de Autenticação para Agendamento
+- **Tipo:** `[Fix / Security / UI/UX / Business Logic]`
+- **Motivo / Solicitação:** Usuário reportou indignação com a presença indevida de botões de agendamento ("Minha Agenda"), dados pessoais e chat no menu quando não há nenhum usuário logado no aplicativo ("Que porra é essa de agendamento e demais botões se não há usuário logado????? Não alucina porfavor").
+- **Ações Realizadas:**
+  - `src/components/ProfileDrawer.tsx`:
+    - Ocultadas estritamente todas as opções exclusivas de cliente autenticado (`Minha Agenda`, `Meus Dados Pessoais`, `Chat no App Vagou` e `Sair da Conta`) quando o cliente não estiver logado (`!isClientLoggedIn`). O visitante não vê mais botões fantasmas de funcionalidades que exigem conta.
+    - Atualizado o cabeçalho do drawer quando deslogado de *"Menu do Cliente"* para *"Acesse sua Conta"*, evitando contradição semântica com o estado de visitante.
+    - Adicionado hook de proteção que força a aba ativa do drawer para `'menu'` caso o estado de autenticação seja deslogado, impedindo que o visitante fique preso em visualizações restritas de agenda ou dados.
+  - `src/components/SalonBookingModal.tsx`:
+    - Adicionada prop `isClientLoggedIn`.
+    - Na etapa final de confirmação de agendamento, quando o usuário não estiver logado (`isClientLoggedIn === false`), o botão principal agora exibe clara e expressamente *"Entrar e Confirmar Agendamento"* com o ícone `LogIn` e tipografia `text-white` sobre fundo verde, sinalizando que a confirmação exige identificação do cliente.
+  - `src/components/SalonProfileView.tsx`:
+    - Bloqueada a confirmação anônima de agendamentos no `handleConfirmSchedule`: se `!isClientLoggedIn`, os dados do agendamento são preservados temporariamente em `vagou_pending_booking` e o modal de autenticação (`UserAuthModal`) é aberto imediatamente.
+    - Ao concluir login/cadastro no `handleClientLoginSuccess`, o sistema recupera e confirma automaticamente o agendamento em nome do cliente recém-identificado.
+    - Repassada a propriedade `isClientLoggedIn` para a instância inline do `SalonBookingModal`.
+- **Arquivos Impactados:**
+  - `src/components/ProfileDrawer.tsx`
+  - `src/components/SalonBookingModal.tsx`
+  - `src/components/SalonProfileView.tsx`
+  - `CHANGELOG.md`
+
+### [2026-09-28] — Ajuste de Autenticação, Estado de Convidado e Correção de Logout
+- **Tipo:** `[Fix / UI/UX / Session State]`
+- **Motivo / Solicitação:** 
+  1. Corrigir o modal de autenticação que estava preservando o estado "cadastrar" ao ser reaberto. Ele deve sempre abrir diretamente no formulário de "Entrar", com o link sutil de cadastro abaixo.
+  2. Corrigir o comportamento de logout e estado inicial de login do cliente ("App não faz logout..."). O aplicativo estava assumindo erroneamente que novos usuários ou sessões limpas já começavam logados como "Anderson" devido a uma comparação inadequada de `null !== 'false'` no `localStorage`.
+- **Ações Realizadas:**
+  - `src/components/UserAuthModal.tsx`:
+    - Adicionado hook `useEffect` que detecta a abertura do modal (`isOpen`) e força o reset completo do estado visual para `'login'`, além de limpar todos os campos de formulário e erros, garantindo que o usuário encontre sempre uma interface limpa e focada em "Entrar".
+  - `src/components/SalonProfileView.tsx`:
+    - Refatorada a inicialização do estado `isClientLoggedIn` para usar correspondência direta positiva (`=== 'true'`) no localStorage, garantindo que o usuário comece estritamente como "Cliente Convidado" (deslogado/guest) por padrão.
+    - Sincronizada a variável `currentUserName` para exibir `'Cliente Convidado'` se o login não estiver ativo.
+    - Corrigido o `viewMode` inicial para priorizar `'pub'` (visão pública de cliente) quando nenhuma preferência anterior estiver salva, resguardando a jornada do cliente de um estabelecimento.
+  - `src/App.tsx`:
+    - Atualizados os seletores de estado inicial de `userName` e `userAvatarUrl` para validar `vagou_client_logged_in === 'true'`, garantindo sincronismo perfeito de perfil.
+    - Sincronizada a função de polling de sincronização `loadAppointments` para ler e aplicar corretamente o estado deslogado `'Cliente Convidado'`, resolvendo o problema de persistência reversa que impedia o logout.
+- **Arquivos Impactados:**
+  - `src/components/UserAuthModal.tsx`
+  - `src/components/SalonProfileView.tsx`
+  - `src/App.tsx`
+  - `CHANGELOG.md`
+
+### [2026-09-28] — Sistema de Autenticação de Clientes (Login & Cadastro com Fricção Intencional)
+- **Tipo:** `[Feature / UI/UX / Security / Client Auth]`
+- **Motivo / Solicitação:** O usuário solicitou ajustar o modal de autenticação. O correto é, ao clicar em entrar, abrir o modal de login ("Entrar") diretamente por padrão. Abaixo deve haver um link secundário ("Não tem uma conta? Cadastre-se") que abre o formulário de cadastro de conta apenas após ser clicado, em vez de abrir direto no cadastro.
+- **Ações Realizadas:**
+  - `src/components/UserAuthModal.tsx`:
+    - Criado componente de autenticação de clientes completo e em alta fidelidade.
+    - Default para tela de **"Entrar"** (Login) com inputs de E-mail e Senha e botão primário, mantendo o link principal com 1-toque *"Continuar com Google"*.
+    - Link secundário discreto no rodapé *"Não tem uma conta? Cadastre-se"* que faz o swap dinâmico para a tela de **"Cadastrar"** (Formulário de Cadastro).
+    - Implementação da **"Fricção Intencional de Segurança"** em etapas sucessivas para evitar bots:
+      - Etapa 1: Código de verificação de 6 dígitos enviado ao e-mail.
+      - Etapa 2: Captura do WhatsApp para controle de "no-show" e segurança.
+      - Etapa 3: Solicitação nativa de Push Notifications para lembretes de agendamentos em tempo real.
+    - Total conformidade com o design system do Vagou (curvatura `rounded-[4px]`, contraste de fundo verde sólido exigindo texto branco, e ícones exclusivos do `lucide-react`).
+  - `src/components/ProfileDrawer.tsx`:
+    - Adicionado suporte a estado de login do cliente (`isClientLoggedIn`) e callbacks de login/logout (`onLoginClient`, `onLogoutClient`).
+    - Renderização do Card de Identificação em estado "Convidado" caso não esteja logado, oferecendo um botão primário de "Entrar" e o toggler de tema lado a lado.
+    - Travas de segurança para opções de "Meus Dados Pessoais", "Minha Agenda" e "Chat no App" direcionando diretamente para o fluxo de Login caso o cliente não esteja autenticado.
+    - Botão elegante "Sair da Conta" no menu principal para o cliente realizar logout.
+  - `src/components/SalonProfileView.tsx`:
+    - Integrado o estado de login do cliente com persistência em `localStorage`.
+    - Implementado callback de login com hidratação automática dos dados do perfil e callback de logout com reversão para "Cliente Convidado".
+    - Renderização do novo `<UserAuthModal />` de forma síncrona.
+- **Arquivos Impactados:**
+  - `src/components/UserAuthModal.tsx`
+  - `src/components/ProfileDrawer.tsx`
+  - `src/components/SalonProfileView.tsx`
+  - `CHANGELOG.md`
+
+
+
 ### [2026-09-23] — Ficha Relâmpago Operacional de Bancada (Próximo Cliente / Na Cadeira)
 - **Tipo:** `[Feature / UI/UX Cockpit / Professional Dashboard]`
 - **Motivo / Solicitação:** Usuário solicitou transformar o topo inicial do painel profissional em uma ferramenta prática de trabalho de bancada ("com o app na mão para trabalhar, não apenas um agendador"), exibindo o próximo cliente com ficha sintética, status em tempo real e ações diretas.

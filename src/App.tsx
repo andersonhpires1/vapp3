@@ -20,7 +20,7 @@ const INITIAL_SALON_OFFERS: ServiceOffer[] = [
     id: 'off-1',
     salonName: 'Barbearia Rota 99',
     professionalName: 'Carlos Silva',
-    professionalAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    professionalAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
     serviceTitle: 'Corte Degradê & Barboterapia',
     serviceCategory: 'cabelo',
     price: 45.0,
@@ -48,7 +48,7 @@ const INITIAL_SALON_OFFERS: ServiceOffer[] = [
     id: 'off-2',
     salonName: 'Barbearia Rota 99',
     professionalName: 'Carlos Silva',
-    professionalAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    professionalAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
     serviceTitle: 'Barboterapia com Toalha Quente',
     serviceCategory: 'barba',
     price: 35.0,
@@ -106,10 +106,16 @@ export const App: React.FC = () => {
   const { isDark, accentColor } = useTheme();
   const [viewMode, setViewMode] = useState<'salon' | 'agenda' | 'dashboard'>('salon');
   const [userName, setUserName] = useState(() => {
-    return localStorage.getItem('vagou_user_name') || 'Anderson';
+    if (localStorage.getItem('vagou_client_logged_in') === 'true') {
+      return localStorage.getItem('vagou_user_name') || 'Anderson';
+    }
+    return 'Cliente Convidado';
   });
   const [userAvatarUrl, setUserAvatarUrl] = useState(() => {
-    return localStorage.getItem('vagou_user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80';
+    if (localStorage.getItem('vagou_client_logged_in') === 'true') {
+      return localStorage.getItem('vagou_user_avatar') || '';
+    }
+    return '';
   });
   const [appointments, setAppointments] = useState<BookingAppointment[]>([]);
 
@@ -131,12 +137,17 @@ export const App: React.FC = () => {
       }
 
       const savedName = localStorage.getItem('vagou_user_name');
-      if (savedName) {
-        setUserName(savedName);
+      if (localStorage.getItem('vagou_client_logged_in') === 'true') {
+        setUserName(savedName || 'Anderson');
+      } else {
+        setUserName('Cliente Convidado');
       }
+      
       const savedAvatar = localStorage.getItem('vagou_user_avatar');
-      if (savedAvatar) {
-        setUserAvatarUrl(savedAvatar);
+      if (localStorage.getItem('vagou_client_logged_in') === 'true') {
+        setUserAvatarUrl(savedAvatar || '');
+      } else {
+        setUserAvatarUrl('');
       }
     } catch {
       setAppointments([]);
@@ -371,6 +382,10 @@ export const App: React.FC = () => {
               userAvatarUrl={userAvatarUrl}
               onNavigateToUserAppointments={handleNavigateToAgenda}
               onNavigateToUserDashboard={() => setViewMode('dashboard')}
+              onUpdateProfile={(newName, newAvatar) => {
+                setUserName(newName);
+                setUserAvatarUrl(newAvatar);
+              }}
             />
           ) : viewMode === 'agenda' ? (
             <UserAppointmentsView

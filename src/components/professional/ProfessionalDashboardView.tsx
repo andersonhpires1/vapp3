@@ -57,7 +57,7 @@ const DEFAULT_TEAM_MEMBERS: DashboardTeamMember[] = [
     role: 'admin',
     roleLabel: 'Dono / Master Barber',
     commissionRate: 100,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
   },
   {
     id: 'mateus-ramos',

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   X, Calendar, Clock, User, CheckCircle2, ChevronLeft, ChevronRight, 
   Sparkles, Star, Scissors, ArrowLeft, Building2, ChevronDown, AlertCircle,
-  Check, Video, Images
+  Check, Video, Images, LogIn
 } from 'lucide-react';
 import { ServiceOffer, CatalogServiceItem } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -35,6 +35,7 @@ interface SalonBookingModalProps {
   initialTimeSlot?: string | null;
   initialDateIso?: string;
   preSelectedProfessionalName?: string;
+  isClientLoggedIn?: boolean;
   onConfirmAppointment: (bookingData: {
     service: CatalogServiceItem;
     professional: string;
@@ -64,6 +65,7 @@ export const SalonBookingModal: React.FC<SalonBookingModalProps> = ({
   initialTimeSlot,
   initialDateIso,
   preSelectedProfessionalName,
+  isClientLoggedIn,
   onConfirmAppointment,
 }) => {
   const { isDark } = useTheme();
@@ -942,8 +944,17 @@ export const SalonBookingModal: React.FC<SalonBookingModalProps> = ({
               onClick={handleConfirmFinal}
               className="w-full py-2.5 px-4 bg-[#20C933] hover:bg-[#1bb32d] active:scale-98 text-white drop-shadow-xs font-black text-xs uppercase tracking-wider rounded transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer font-['Poppins']"
             >
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>Confirmar Agendamento</span>
+              {isClientLoggedIn === false ? (
+                <>
+                  <LogIn className="w-4 h-4 text-white" />
+                  <span>Entrar e Confirmar Agendamento</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <span>Confirmar Agendamento</span>
+                </>
+              )}
             </button>
           )}
         </div>

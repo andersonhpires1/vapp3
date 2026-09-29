@@ -18,8 +18,6 @@ import { hapticLight, hapticSuccess } from '../utils/haptics';
 
 // Avatares premium pré-selecionados para o usuário escolher
 const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
   'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80',
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
@@ -42,7 +40,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   });
   
   const [avatarUrl, setAvatarUrl] = useState(() => {
-    return localStorage.getItem('vagou_user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80';
+    return localStorage.getItem('vagou_user_avatar') || '';
   });
 
   const [email, setEmail] = useState(() => {
@@ -208,12 +206,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                     : 'border-slate-300 hover:border-emerald-500 bg-slate-100 shadow-2xs'
               }`}
             >
-              <img 
-                src={avatarUrl} 
-                alt="Foto do Perfil" 
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
+              {avatarUrl ? (
+                <img 
+                  src={avatarUrl} 
+                  alt="Foto do Perfil" 
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-10 h-10 text-emerald-400" />
+              )}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white">
                 <Upload className="w-4 h-4 text-emerald-400 mb-1" />
                 <span className="text-[9px] font-bold text-slate-300 uppercase">Enviar</span>

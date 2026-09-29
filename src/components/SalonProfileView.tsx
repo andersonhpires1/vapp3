@@ -6,7 +6,7 @@ import {
   Check, MessageCircle, MessageSquare,
   Scissors, Hand, Smile, Eye, Sparkles, LayoutDashboard,
   Store, Car, MapPin, Clock, Users, Wifi, Coffee, Wind,
-  LogOut, ShieldCheck, EyeOff, User, Share2
+  LogOut, ShieldCheck, EyeOff, User, Share2, LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ServiceOffer, BookingAppointment, SalonAdminSettings, UserPersona, ProfessionalTeamMember } from '../types';
@@ -27,6 +27,7 @@ import { DEFAULT_ROTA99_LOGO_DARK, DEFAULT_ROTA99_LOGO_LIGHT, DEFAULT_ROTA99_ICO
 import { updateDynamicPwaAssets } from '../utils/pwaAssets';
 import { BottomNav } from './BottomNav';
 import { ProfileDrawer } from './ProfileDrawer';
+import { UserAuthModal } from './UserAuthModal';
 import { hapticSuccess, hapticLight } from '../utils/haptics';
 
 export interface SalonProfileViewProps {
@@ -40,6 +41,7 @@ export interface SalonProfileViewProps {
   userAvatarUrl?: string;
   onNavigateToUserAppointments?: () => void;
   onNavigateToUserDashboard?: () => void;
+  onUpdateProfile?: (newName: string, newAvatarUrl: string) => void;
 }
 
 // Catálogo inicial de serviços padrão
@@ -231,7 +233,7 @@ const INITIAL_PROFESSIONALS: SalonProfessionalItem[] = [
   {
     name: 'Carlos Henrique',
     role: 'Master Barber & Hair Stylist',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
     rating: 4.9,
   },
   {
@@ -481,18 +483,126 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
   isFavorite = false,
   onToggleFavorite,
   userName = 'Lucas Silva',
-  userAvatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+  userAvatarUrl = '',
   onNavigateToUserAppointments,
   onNavigateToUserDashboard,
+  onUpdateProfile,
 }) => {
   const { isDark, accentColor, setAccentColor: setAccentColorContext } = useTheme();
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState<boolean>(false);
-  const [currentUserName, setCurrentUserName] = useState<string>(userName);
+  
+  // Client login states
+  const [isClientLoggedIn, setIsClientLoggedIn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('vagou_client_logged_in') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isUserAuthModalOpen, setIsUserAuthModalOpen] = useState<boolean>(false);
+
+  const [currentUserName, setCurrentUserName] = useState<string>(() => {
+    if (localStorage.getItem('vagou_client_logged_in') === 'true') {
+      return localStorage.getItem('vagou_user_name') || userName;
+    }
+    return 'Cliente Convidado';
+  });
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
   React.useEffect(() => {
-    setCurrentUserName(userName);
-  }, [userName]);
+    if (isClientLoggedIn) {
+      setCurrentUserName(userName);
+    } else {
+      setCurrentUserName('Cliente Convidado');
+    }
+  }, [userName, isClientLoggedIn]);
+
+  const handleClientLoginSuccess = (userData: { name: string; email: string; phone: string; avatarUrl: string }) => {
+    setIsClientLoggedIn(true);
+    setCurrentUserName(userData.name);
+    try {
+      localStorage.setItem('vagou_client_logged_in', 'true');
+      localStorage.setItem('vagou_user_name', userData.name);
+      localStorage.setItem('vagou_user_email', userData.email);
+      localStorage.setItem('vagou_user_phone', userData.phone);
+      localStorage.setItem('vagou_user_avatar', userData.avatarUrl);
+    } catch {
+      // ignore
+    }
+    if (typeof onUpdateProfile === 'function') {
+      onUpdateProfile(userData.name, userData.avatarUrl);
+    }
+
+    // Processar agendamento pendente se houver solicitação aguardando autenticação
+    try {
+      const pendingStr = localStorage.getItem('vagou_pending_booking');
+      if (pendingStr) {
+        localStorage.removeItem('vagou_pending_booking');
+        const pendingBooking = JSON.parse(pendingStr);
+        const rawCode = `VGA-${Math.floor(10000 + Math.random() * 90000)}`;
+        if (primaryOffer) {
+          onDirectBook({
+            ...primaryOffer,
+            id: `sched-${Date.now()}`,
+            salonName: pendingBooking.salonName,
+            serviceTitle: pendingBooking.service.title,
+            price: pendingBooking.price,
+            timeSlot: `${pendingBooking.dateFormatted} às ${pendingBooking.timeSlot}`,
+            dayLabel: pendingBooking.dateFormatted,
+            serviceCategory: (pendingBooking.service.category.toLowerCase().includes('barba') ? 'barba' : 'cabelo') as any,
+          });
+          setConfirmedBookingData({
+            protocolCode: `#${rawCode}`,
+            serviceTitle: pendingBooking.service.title,
+            professionalName: pendingBooking.professional,
+            salonName: pendingBooking.salonName,
+            dateTime: `${pendingBooking.dateFormatted} às ${pendingBooking.timeSlot}`,
+            totalPrice: pendingBooking.price,
+            address: pendingBooking.salonAddress,
+          });
+
+          const savedList = JSON.parse(localStorage.getItem('vagou_user_appointments') || '[]');
+          const newRecord = {
+            protocolCode: rawCode,
+            service: pendingBooking.service.title,
+            professional: pendingBooking.professional,
+            salonName: pendingBooking.salonName,
+            dateTime: `${pendingBooking.dateFormatted} às ${pendingBooking.timeSlot}`,
+            dayGroup: pendingBooking.dateFormatted,
+            time: pendingBooking.timeSlot,
+            totalPrice: pendingBooking.price,
+            status: 'CONFIRMADO',
+            address: pendingBooking.salonAddress,
+            clientName: userData.name,
+            clientPhone: userData.phone,
+          };
+          localStorage.setItem('vagou_user_appointments', JSON.stringify([newRecord, ...savedList]));
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao processar agendamento pendente pós-login:', e);
+    }
+  };
+
+  const handleClientLogout = () => {
+    setIsClientLoggedIn(false);
+    setCurrentUserName('Cliente Convidado');
+    try {
+      localStorage.setItem('vagou_client_logged_in', 'false');
+      localStorage.removeItem('vagou_user_name');
+      localStorage.removeItem('vagou_user_avatar');
+      localStorage.removeItem('vagou_user_appointments');
+      localStorage.removeItem('vagou_user_email');
+      localStorage.removeItem('vagou_user_phone');
+      localStorage.removeItem('vagou_user_profile');
+    } catch {
+      // ignore
+    }
+    if (typeof onUpdateProfile === 'function') {
+      onUpdateProfile('Cliente Convidado', '');
+    }
+  };
+
   const [isLoginPinModalOpen, setIsLoginPinModalOpen] = useState<boolean>(false);
   const [isManagePinModalOpen, setIsManagePinModalOpen] = useState<boolean>(false);
 
@@ -527,9 +637,11 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
   const [viewMode, setViewMode] = useState<'ger' | 'pub'>(() => {
     try {
       const saved = localStorage.getItem('vagou_current_persona');
-      return saved === 'cliente' ? 'pub' : 'ger';
+      if (saved === 'cliente') return 'pub';
+      if (saved === 'pro' || saved === 'admin' || saved === 'profissional') return 'ger';
+      return 'pub';
     } catch {
-      return 'ger';
+      return 'pub';
     }
   });
 
@@ -562,7 +674,7 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
         phone: '(41) 99882-1140',
         commissionRate: 100,
         specialties: ['Cortes Clássicos', 'Barboterapia', 'Visagismo'],
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
         isActive: true,
         joinedAt: new Date().toISOString(),
       },
@@ -1311,6 +1423,18 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
     salonAddress: string;
     price: number;
   }) => {
+    // Bloquear agendamento anônimo e exigir login/cadastro para vincular o cliente
+    if (!isClientLoggedIn) {
+      hapticLight();
+      try {
+        localStorage.setItem('vagou_pending_booking', JSON.stringify(bookingData));
+      } catch {
+        // ignore
+      }
+      setIsUserAuthModalOpen(true);
+      return;
+    }
+
     hapticSuccess();
     const rawCode = `VGA-${Math.floor(10000 + Math.random() * 90000)}`;
     if (primaryOffer) {
@@ -1348,6 +1472,7 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
           totalPrice: bookingData.price,
           status: 'CONFIRMADO',
           address: bookingData.salonAddress,
+          clientName: currentUserName,
         };
         localStorage.setItem('vagou_user_appointments', JSON.stringify([newRecord, ...savedList]));
       } catch {
@@ -1495,23 +1620,51 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
             </button>
           )}
 
-          {/* Foto do Usuário / Abrir Perfil */}
-          <button
-            onClick={() => {
-              hapticLight();
-              setIsProfileDrawerOpen(true);
-            }}
-            className="relative flex items-center justify-center shrink-0 w-8 h-8 sm:w-9.5 sm:h-9.5 rounded overflow-hidden ring-1.5 ring-emerald-500 hover:ring-emerald-400 active:scale-95 transition shadow-xs bg-slate-800 cursor-pointer"
-            title={`Perfil de ${currentUserName}`}
-            aria-label="Perfil do Usuário"
-          >
-            <img
-              src={userAvatarUrl}
-              alt={currentUserName}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </button>
+          {/* Foto do Usuário / Abrir Perfil OU Botão Entrar se cliente deslogado */}
+          {!isClientLoggedIn && currentPersona === 'cliente' ? (
+            <button
+              id="header-login-btn"
+              type="button"
+              onClick={() => {
+                hapticSuccess();
+                setIsUserAuthModalOpen(true);
+              }}
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-[4px] bg-[#20C933] hover:bg-[#1bb32d] active:scale-95 text-white font-bold text-[11px] sm:text-xs flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-500/20 font-['Poppins'] tracking-wider uppercase transition whitespace-nowrap"
+              title="Entrar ou Cadastrar"
+              aria-label="Entrar na conta"
+            >
+              <LogIn className="w-3.5 h-3.5 text-white" />
+              <span className="text-white">Entrar</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                hapticLight();
+                setIsProfileDrawerOpen(true);
+              }}
+              className="relative flex items-center justify-center shrink-0 w-8 h-8 sm:w-9.5 sm:h-9.5 rounded-[4px] overflow-hidden ring-1.5 ring-emerald-500 hover:ring-emerald-400 active:scale-95 transition shadow-xs bg-slate-800 cursor-pointer"
+              title={`Perfil de ${currentUserName}`}
+              aria-label="Perfil do Usuário"
+            >
+              {userAvatarUrl ? (
+                <img
+                  src={userAvatarUrl}
+                  alt={currentUserName}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-emerald-950/80 flex items-center justify-center text-emerald-400 font-bold text-xs sm:text-sm font-['Poppins']">
+                  {currentUserName && currentUserName !== 'Cliente Convidado' ? (
+                    currentUserName.charAt(0).toUpperCase()
+                  ) : (
+                    <User className="w-4 h-4 text-emerald-400" />
+                  )}
+                </div>
+              )}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1975,6 +2128,7 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
                   initialTimeSlot={selectedTimeSlotForBooking}
                   initialDateIso={selectedCalendarDateIso}
                   preSelectedProfessionalName={selectedPublicProfessional}
+                  isClientLoggedIn={isClientLoggedIn}
                   onConfirmAppointment={handleConfirmSchedule}
                 />
               </div>
@@ -2456,6 +2610,16 @@ export const SalonProfileView: React.FC<SalonProfileViewProps> = ({
         onUpdateAppointments={setAppointmentsList}
         onNavigateToUserAppointments={onNavigateToUserAppointments}
         onNavigateToUserDashboard={onNavigateToUserDashboard}
+        isClientLoggedIn={isClientLoggedIn}
+        onLoginClient={() => setIsUserAuthModalOpen(true)}
+        onLogoutClient={handleClientLogout}
+      />
+
+      {/* Modal de Autenticação / Login / Cadastro do Cliente */}
+      <UserAuthModal
+        isOpen={isUserAuthModalOpen}
+        onClose={() => setIsUserAuthModalOpen(false)}
+        onLoginSuccess={handleClientLoginSuccess}
       />
 
       {/* Modal de Autenticação / Login Inicial do Profissional */}
